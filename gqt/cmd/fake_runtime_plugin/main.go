@@ -50,7 +50,9 @@ func main() {
 }
 
 func writeArgs(action string) {
-	err := ioutil.WriteFile(filepath.Join(os.TempDir(), fmt.Sprintf("%s-args", action)), []byte(strings.Join(os.Args, " ")), 0777)
+	pathname := filepath.Join(os.TempDir(), fmt.Sprintf("%s-args", action))
+
+	err := ioutil.WriteFile(pathname, []byte(strings.Join(os.Args, " ")), 0666)
 	if err != nil {
 		panic(err)
 	}
