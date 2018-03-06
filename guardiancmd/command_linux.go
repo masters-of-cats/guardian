@@ -135,7 +135,14 @@ func (f *LinuxFactory) WireRootfsFileCreator() rundmc.RootfsFileCreator {
 	return preparerootfs.SymlinkRefusingFileCreator{}
 }
 
-func defaultBindMounts(binInitPath string) []specs.Mount {
+func initProcBindMount(binInitPath string) ([]specs.Mount, string) {
+	destPath := fmt.Sprintf("/tmp/%s", filepath.Base(binInitPath))
+	return []specs.Mount{
+		{Type: "bind", Source: binInitPath, Destination: destPath, Options: []string{"bind"}},
+	}, destPath
+}
+
+func defaultBindMounts() []specs.Mount {
 	devptsGid := 0
 	if runningAsRoot() {
 		devptsGid = 5
@@ -146,7 +153,6 @@ func defaultBindMounts(binInitPath string) []specs.Mount {
 		{Type: "tmpfs", Source: "tmpfs", Destination: "/dev/shm", Options: []string{"rw", "nodev", "relatime"}},
 		{Type: "devpts", Source: "devpts", Destination: "/dev/pts",
 			Options: []string{"nosuid", "noexec", "newinstance", fmt.Sprintf("gid=%d", devptsGid), "ptmxmode=0666", "mode=0620"}},
-		{Type: "bind", Source: binInitPath, Destination: "/tmp/bin/garden-init", Options: []string{"bind"}},
 	}
 }
 

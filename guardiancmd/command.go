@@ -742,6 +742,11 @@ func (cmd *ServerCommand) wireImagePlugin(commandRunner commandrunner.CommandRun
 func (cmd *ServerCommand) wireContainerizer(log lager.Logger, factory GardenFactory,
 	properties gardener.PropertyManager, volumizer peas.Volumizer) *rundmc.Containerizer {
 
+	mounts, containerInitPath := initProcBindMount(cmd.Bin.Init.Path())
+	defaultMounts := append(mounts, defaultBindMounts()...)
+	privilegedMounts := append(defaultMounts, privilegedMounts()...)
+	unprivilegedMounts := append(defaultMounts, unprivilegedMounts()...)
+
 	// TODO centralize knowledge of garden -> runc capability schema translation
 	baseProcess := specs.Process{
 		Capabilities: &specs.LinuxCapabilities{
@@ -750,14 +755,11 @@ func (cmd *ServerCommand) wireContainerizer(log lager.Logger, factory GardenFact
 			Inheritable: unprivilegedMaxCaps,
 			Permitted:   unprivilegedMaxCaps,
 		},
-		Args:        []string{"/tmp/bin/garden-init"},
+		Args: []string{containerInitPath},
+		// Args:        []string{"/tmp/bin/garden-init"},
 		Cwd:         "/",
 		ConsoleSize: &specs.Box{},
 	}
-
-	mounts := defaultBindMounts(cmd.Bin.Init.Path())
-	privilegedMounts := append(mounts, privilegedMounts()...)
-	unprivilegedMounts := append(mounts, unprivilegedMounts()...)
 
 	baseBundle := goci.Bundle().
 		WithNamespaces(PrivilegedContainerNamespaces...).

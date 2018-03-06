@@ -1,6 +1,7 @@
 package guardiancmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,10 +102,15 @@ func wireEnvFunc() runrunc.EnvFunc {
 	return runrunc.EnvFunc(runrunc.WindowsEnvFor)
 }
 
-func defaultBindMounts(binInitPath string) []specs.Mount {
+func initProcBindMount(binInitPath string) ([]specs.Mount, string) {
+	destPath := fmt.Sprintf("/tmp/bin/%s", filepath.Base(binInitPath))
 	return []specs.Mount{
-		{Type: "bind", Source: filepath.Dir(binInitPath), Destination: "/tmp/bin", Options: []string{"bind"}},
-	}
+		{Type: "bind", Source: filepath.Dir(binInitPath), Destination: filepath.Dir(destPath), Options: []string{"bind"}},
+	}, destPath
+}
+
+func defaultBindMounts() []specs.Mount {
+	return []specs.Mount{}
 }
 
 func privilegedMounts() []specs.Mount {
