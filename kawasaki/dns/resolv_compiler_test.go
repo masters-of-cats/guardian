@@ -1,7 +1,7 @@
 package dns_test
 
 import (
-	"fmt"
+	functional "BooleanCat/go-functional"
 	"net"
 
 	. "code.cloudfoundry.org/guardian/kawasaki/dns"
@@ -73,10 +73,6 @@ var _ = Describe("compiling the resolv.conf file", func() {
 })
 
 func nameservers(ips ...string) []string {
-	entries := []string{}
-	for _, ip := range ips {
-		entries = append(entries, fmt.Sprintf("nameserver %s", ip))
-	}
-
-	return entries
+	op := func(ip string) string { return "nameserver " + ip }
+	return functional.LiftStringSlice(ips).Map(op).Collect()
 }

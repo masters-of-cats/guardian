@@ -1,6 +1,7 @@
 package dadoo
 
 import (
+	functional "BooleanCat/go-functional"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -270,16 +271,19 @@ func (p *process) ID() string {
 }
 
 func (p *process) mkfifos(hostUid, hostGid uint32) error {
-	for _, pipe := range []string{p.stdin, p.stdout, p.stderr, p.winsz, p.exit} {
-		if err := syscall.Mkfifo(pipe, 0600); err != nil {
-			return err
-		}
-		if err := os.Chown(pipe, int(hostUid), int(hostGid)); err != nil {
-			return err
-		}
-	}
+	pipes := []string{p.stdin, p.stdout, p.stderr, p.winsz, p.exit}
+	_, err := functional.LiftStringSlice(pipes).WithErrs().Map(mkfifo).Map(chownBuilder(hostGid, hostGid)).Collect()
+	return err
+}
 
-	return nil
+func mkfifo(path string) (string, error) {
+	return path, syscall.Mkfifo(path, 0600)
+}
+
+func chownBuilder(uid, gid uint32) func(string) (string, error) {
+	return func(path string) (string, error) {
+		return path, syscall.Chown(path, int(uid), int(gid))
+	}
 }
 
 func (p process) openPipes(pio garden.ProcessIO) (stdin, stdout, stderr *os.File, err error) {

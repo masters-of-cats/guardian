@@ -1,6 +1,7 @@
 package dns
 
 import (
+	functional "BooleanCat/go-functional"
 	"fmt"
 	"net"
 	"regexp"
@@ -28,28 +29,40 @@ func parseResolvContents(resolvContents string, hostIP net.IP) []string {
 		return nameserverEntries([]net.IP{hostIP})
 	}
 
-	entries := []string{}
-	for _, resolvEntry := range strings.Split(strings.TrimSpace(resolvContents), "\n") {
-		if resolvEntry == "" {
-			continue
-		}
+	hasNameserverPrefix := hasPrefixBuilder("nameserver")
+	isLoopback := matchBuilder(regexp.MustCompile(`127\.\d{1,3}\.\d{1,3}\.\d{1,3}`))
 
-		if !strings.HasPrefix(resolvEntry, "nameserver") {
-			entries = append(entries, resolvEntry)
-			continue
-		}
+	functor := functional.LiftStringSlice(strings.Split(strings.TrimSpace(resolvContents), "\n")).Exclude(isEmpty)
+	nonNameservers := functor.Exclude(hasNameserverPrefix)
+	nameservers := functor.Filter(hasNameserverPrefix).Exclude(isLoopback).Filter(hasWordCountBuilder(2)).Map(lastWord)
 
-		pattern := regexp.MustCompile(`127\.\d{1,3}\.\d{1,3}\.\d{1,3}`)
-		if !pattern.MatchString(resolvEntry) {
-			nameserverFields := strings.Fields(resolvEntry)
-			if len(nameserverFields) != 2 {
-				continue
-			}
-			entries = append(entries, nameserverEntry(nameserverFields[1]))
-		}
+	return nonNameservers.Chain(nameservers).Collect()
+}
+
+func isEmpty(s string) bool {
+	return s == ""
+}
+
+func hasPrefixBuilder(prefix string) func(string) bool {
+	return func(s string) bool {
+		return strings.HasPrefix(s, prefix)
 	}
+}
 
-	return entries
+func matchBuilder(pattern *regexp.Regexp) func(string) bool {
+	return func(s string) bool {
+		return pattern.MatchString(s)
+	}
+}
+
+func hasWordCountBuilder(n int) func(string) bool {
+	return func(s string) bool {
+		return len(strings.Fields(s)) == n
+	}
+}
+
+func lastWord(s string) string {
+	return strings.Fields(s)[len(s)]
 }
 
 func nameserverEntries(ips []net.IP) []string {
