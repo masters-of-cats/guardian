@@ -486,7 +486,7 @@ var _ = Describe("PeaCreator", func() {
 			})
 		})
 
-		Context("when the specified username /etc/passwd does not exist", func() {
+		Context("when the /etc/passwd does not exist in the rootfs", func() {
 			BeforeEach(func() {
 				processSpec.User = "bob"
 				Expect(os.Remove(filepath.Join(rootfsDir, "etc", "passwd"))).To(Succeed())

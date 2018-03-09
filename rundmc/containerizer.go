@@ -1,8 +1,12 @@
 package rundmc
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -153,6 +157,39 @@ func (c *Containerizer) Run(log lager.Logger, handle string, spec garden.Process
 	}
 
 	if spec.Image != (garden.ImageRef{}) {
+		passwdFileContent := new(bytes.Buffer)
+		passwdGetterProc, err := c.peaCreator.CreatePea(log, garden.ProcessSpec{
+			Path:  "/bin/cat",
+			Args:  []string{"/etc/passwd"},
+			Image: spec.Image,
+			User:  "0:0",
+		},
+			garden.ProcessIO{Stdout: passwdFileContent},
+			"",
+			path,
+		)
+		if err != nil {
+			return nil, err
+		}
+		_, err = passwdGetterProc.Wait()
+		if err != nil {
+			return nil, err
+		}
+		log.Info("passwd-file-content", lager.Data{
+			"passwd": passwdFileContent.String(),
+		})
+
+		uid, gid, err := convertUsername(passwdFileContent, spec.User)
+		if err != nil {
+			return nil, err
+		}
+		log.Info("translated-to-uid-gid", lager.Data{
+			"username": spec.User,
+			"uid":      uid,
+			"gid":      gid,
+		})
+		spec.User = fmt.Sprintf("%d:%d", uid, gid)
+
 		return c.peaCreator.CreatePea(log, spec, io, handle, path)
 	}
 
@@ -163,6 +200,27 @@ func (c *Containerizer) Run(log lager.Logger, handle string, spec garden.Process
 	}
 
 	return c.runtime.Exec(log, path, handle, spec, io)
+}
+
+func convertUsername(r io.Reader, u string) (int, int, error) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		userEntries := strings.Split(scanner.Text(), ":")
+		if userEntries[0] != u {
+			continue
+		}
+		uid, err := strconv.Atoi(userEntries[2])
+		if err != nil {
+			return 0, 0, fmt.Errorf("Could not get uid for user '%s'", u)
+		}
+		gid, err := strconv.Atoi(userEntries[3])
+		if err != nil {
+			return 0, 0, fmt.Errorf("Could not get gid for user '%s'", u)
+		}
+		return uid, gid, nil
+	}
+
+	return 0, 0, fmt.Errorf("Couldn't find user '%s' in the passwd file of the container", u)
 }
 
 func (c *Containerizer) Attach(log lager.Logger, handle string, processID string, io garden.ProcessIO) (garden.Process, error) {
