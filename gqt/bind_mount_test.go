@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Bind mount", func() {
+var _ = FDescribe("Bind mount", func() {
 	var (
 		client    *runner.RunningGarden
 		container garden.Container
@@ -39,7 +39,6 @@ var _ = Describe("Bind mount", func() {
 		bindMountOrigin = garden.BindMountOriginHost
 		testFileName = ""
 		mountOptions = []string{"--bind"}
-		bindMountOrigin = garden.BindMountOriginHost
 	})
 
 	JustBeforeEach(func() {
@@ -265,7 +264,7 @@ var _ = Describe("Bind mount", func() {
 					Expect(readProcess.Wait()).To(Equal(0))
 				})
 
-				It("allows non-root to write to nested bind mounts", func() {
+				FIt("allows non-root to write to nested bind mounts", func() {
 					nestedPath := filepath.Join(dstPath, "nested-bind")
 					writeProcess := writeFile(container, nestedPath, "alice")
 					Expect(writeProcess.Wait()).To(Equal(0))
@@ -419,7 +418,7 @@ func containerReadFile(container garden.Container, dstPath, fileName, user strin
 		Path: "cat",
 		Args: []string{filePath},
 		User: user,
-	}, garden.ProcessIO{})
+	}, ginkgoIO)
 	Expect(err).ToNot(HaveOccurred())
 
 	return process
@@ -428,6 +427,7 @@ func containerReadFile(container garden.Container, dstPath, fileName, user strin
 func writeFile(container garden.Container, dstPath, user string) garden.Process {
 	// try to write a new file
 	filePath := filepath.Join(dstPath, "checkFileAccess-file")
+	// time.Sleep(time.Hour)
 
 	process, err := container.Run(garden.ProcessSpec{
 		Path: "touch",

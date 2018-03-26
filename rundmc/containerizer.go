@@ -160,26 +160,75 @@ func (c *Containerizer) Run(log lager.Logger, handle string, spec garden.Process
 		return nil, err
 	}
 
-	if spec.Image != (garden.ImageRef{}) {
-		if shouldResolveUsername(spec.User) {
-			resolvedUID, resolvedGID, err := c.peaUsernameResolver.ResolveUser(log, bundlePath, handle, spec.Image, spec.User)
-			if err != nil {
-				return nil, err
-			}
-
-			spec.User = fmt.Sprintf("%d:%d", resolvedUID, resolvedGID)
-		}
-
-		return c.peaCreator.CreatePea(log, spec, io, handle, bundlePath)
-	}
-
-	if spec.BindMounts != nil {
-		err := fmt.Errorf("Running a process with bind mounts and no image provided is not allowed")
-		log.Error("invalid-spec", err)
+	//TODO how often are we calling this
+	bundle, err := c.loader.Load(bundlePath)
+	if err != nil {
 		return nil, err
 	}
 
-	return c.runtime.Exec(log, bundlePath, handle, spec, io)
+	// pea rootfs defaults to containers rootfs
+	if spec.Image == (garden.ImageRef{}) {
+		containerRootfsPath := bundle.RootFS()
+		spec.Image = garden.ImageRef{URI: "raw://" + containerRootfsPath}
+
+		// exec-style processes depend on bind mounts defined in sandbox
+		// sandboxBindMounts := getBindMounts(bundle)
+		// spec.BindMounts = append(sandboxBindMounts, spec.BindMounts...)
+
+	}
+
+	if shouldResolveUsername(spec.User) {
+		resolvedUID, resolvedGID, err := c.peaUsernameResolver.ResolveUser(log, bundlePath, handle, spec.Image, spec.User)
+		if err != nil {
+			return nil, err
+		}
+
+		spec.User = fmt.Sprintf("%d:%d", resolvedUID, resolvedGID)
+	}
+
+	return c.peaCreator.CreatePea(log, spec, io, handle, bundlePath)
+
+	// if spec.BindMounts != nil {
+	// 	err := fmt.Errorf("Running a process with bind mounts and no image provided is not allowed")
+	// 	log.Error("invalid-spec", err)
+	// 	return nil, err
+	// }
+	//
+	// return c.runtime.Exec(log, bundlePath, handle, spec, io)
+}
+
+func getBindMounts(bndl goci.Bndl) []garden.BindMount {
+	bindMounts := []specs.Mount{}
+
+	sandboxMounts := bndl.Spec.Mounts
+	for _, mount := range sandboxMounts {
+		if mount.Type == "bind" {
+			bindMounts = append(bindMounts, mount)
+		}
+	}
+
+	return toGardenMounts(bindMounts)
+}
+
+func toGardenMounts(mounts []specs.Mount) (gardenMounts []garden.BindMount) {
+	for _, mount := range mounts {
+		gardenMounts = append(gardenMounts, garden.BindMount{
+			DstPath: mount.Destination,
+			SrcPath: mount.Source,
+			Mode:    mountMode(mount.Options),
+			Origin:  garden.BindMountOriginHost,
+		})
+	}
+	return
+}
+
+func mountMode(options []string) garden.BindMountMode {
+	for _, opt := range options {
+		if opt == "rw" {
+			return garden.BindMountModeRW
+		}
+	}
+	return garden.BindMountModeRO
 }
 
 func shouldResolveUsername(username string) bool {

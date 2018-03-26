@@ -12,7 +12,9 @@ func Bundle() Bndl {
 	return Bndl{
 		Spec: specs.Spec{
 			Version: "1.0.0",
-			Linux:   &specs.Linux{},
+			Linux:   &specs.Linux{
+			// RootfsPropagation: "shared",
+			},
 			Windows: &specs.Windows{
 				Network:      &specs.WindowsNetwork{},
 				LayerFolders: []string{},
