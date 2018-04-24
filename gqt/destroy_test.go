@@ -236,7 +236,7 @@ var _ = Describe("Destroying a Container", func() {
 		})
 	})
 
-	FContext("when the containerd socket has been passed", func() {
+	Context("when the containerd socket has been passed", func() {
 		var (
 			containerdSession *gexec.Session
 			container         garden.Container
