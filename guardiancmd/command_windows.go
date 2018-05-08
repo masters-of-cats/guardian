@@ -63,7 +63,7 @@ func (f *WindowsFactory) WireVolumizer(logger lager.Logger) gardener.Volumizer {
 	return gardener.NewVolumeProvider(noop, noop, gardener.CommandFactory(preparerootfs.Command), f.commandRunner, 0, 0)
 }
 
-func (f *WindowsFactory) WireExecRunner(runMode string) runrunc.ExecRunner {
+func (f *WindowsFactory) WireExecRunner(runMode, runcRoot string) runrunc.ExecRunner {
 	return &execrunner.DirectExecRunner{
 		RuntimePath:   f.config.Runtime.Plugin,
 		CommandRunner: f.commandRunner,
@@ -155,6 +155,10 @@ func ensureServerSocketDoesNotLeak(socketFD uintptr) error {
 	panic("this should be unreachable: no sockets on Windows")
 }
 
-func wireContainerd(socket string, bndlLoader *goci.BndlLoader) (rundmc.OCIRuntime, error) {
+func wireContainerd(socket string, bndlLoader *goci.BndlLoader, execer *runrunc.Execer) (rundmc.OCIRuntime, error) {
 	return nil, errors.New("containerd not impletemented on windows")
+}
+
+func containerdRuncRoot() string {
+	return ""
 }

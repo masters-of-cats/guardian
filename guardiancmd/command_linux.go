@@ -35,6 +35,7 @@ import (
 	"code.cloudfoundry.org/idmapper"
 	"code.cloudfoundry.org/lager"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/linux/proc"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/graph"
@@ -98,10 +99,11 @@ func (NoopMkdirer) MkdirAs(rootFSPathFile string, uid, gid int, mode os.FileMode
 	return nil
 }
 
-func (f *LinuxFactory) WireExecRunner(runMode string) runrunc.ExecRunner {
+func (f *LinuxFactory) WireExecRunner(runMode, runcRoot string) runrunc.ExecRunner {
 	return dadoo.NewExecRunner(
 		f.config.Bin.Dadoo.Path(),
 		f.config.Runtime.Plugin,
+		runcRoot,
 		f.signallerFactory,
 		f.commandRunner,
 		f.config.Containers.CleanupProcessDirsOnWait,
@@ -327,12 +329,16 @@ func wireMounts() bundlerules.Mounts {
 	}
 }
 
-func wireContainerd(socket string, bndlLoader *goci.BndlLoader) (rundmc.OCIRuntime, error) {
+func wireContainerd(socket string, bndlLoader *goci.BndlLoader, execer *runrunc.Execer) (rundmc.OCIRuntime, error) {
 	containerdClient, err := containerd.New(socket)
 	if err != nil {
 		return nil, err
 	}
 	ctx := namespaces.WithNamespace(context.Background(), "garden")
 	nerd := nerd.New(containerdClient, ctx)
-	return runcontainerd.New(nerd, bndlLoader), nil
+	return runcontainerd.New(nerd, bndlLoader, execer), nil
+}
+
+func containerdRuncRoot() string {
+	return proc.RuncRoot
 }

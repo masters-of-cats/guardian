@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 )
 
-func BuildRuncCommand(runtimePath, runMode, processPath, containerHandle, ttyConsoleSocket, logfilePath string) *exec.Cmd {
+func BuildRuncCommand(runtimePath, runMode, processPath, containerHandle, ttyConsoleSocket, logfilePath, runcRoot string) *exec.Cmd {
 	runtimeArgs := []string{
+		"--root", runcRoot,
 		"--debug", "--log", logfilePath, "--log-format", "json",
 		runMode,
 		"--detach",

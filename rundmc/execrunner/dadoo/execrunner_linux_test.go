@@ -70,7 +70,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 		processPath = filepath.Join(bundlePath, "doesnt-have-to-be-processes", processID)
 		Expect(os.MkdirAll(processPath, 0700)).To(Succeed())
 
-		runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc",
+		runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root",
 			signallerFactory, fakeCommandRunner, false, "exec")
 		log = lagertest.NewTestLogger("test")
 
@@ -235,14 +235,14 @@ var _ = Describe("Dadoo ExecRunner", func() {
 			Expect(fakeCommandRunner.StartedCommands()[0].Args).To(
 				ConsistOf(
 					"path-to-dadoo",
-					"exec", "path-to-runc", processPath, "some-handle",
+					"exec", "path-to-runc", "runc-root", processPath, "some-handle",
 				),
 			)
 		})
 
 		Context("when the exec mode is 'run'", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc",
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root",
 					signallerFactory, fakeCommandRunner, false, "run")
 			})
 
@@ -253,7 +253,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 				Expect(fakeCommandRunner.StartedCommands()[0].Args).To(
 					ConsistOf(
 						"path-to-dadoo",
-						"run", "path-to-runc", processPath, processID,
+						"run", "path-to-runc", "runc-root", processPath, processID,
 					),
 				)
 			})
@@ -267,7 +267,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 					Equal([]string{
 						"path-to-dadoo",
 						"-tty",
-						"exec", "path-to-runc", processPath, "some-handle",
+						"exec", "path-to-runc", "runc-root", processPath, "some-handle",
 					}),
 				)
 			})
@@ -329,7 +329,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 
 		Context("when cleanupProcessDirsOnWait is true", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc",
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root",
 					signallerFactory, fakeCommandRunner, true, "exec")
 			})
 
@@ -348,7 +348,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 
 		Context("when cleanupProcessDirsOnWait is false", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc",
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root",
 					signallerFactory, fakeCommandRunner, false, "exec")
 			})
 
@@ -764,7 +764,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 
 			Context("when cleanupProcessDirsOnWait is true", func() {
 				JustBeforeEach(func() {
-					runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc",
+					runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root",
 						signallerFactory, fakeCommandRunner, true, "exec")
 				})
 
@@ -828,7 +828,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 	Describe("Attach after Run", func() {
 		Context("when cleanupProcessDirsOnWait is true", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", signallerFactory, fakeCommandRunner, true, "exec")
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root", signallerFactory, fakeCommandRunner, true, "exec")
 			})
 
 			It("cleans up the processes dir after Wait returns", func() {
@@ -848,7 +848,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 
 		Context("when cleanupProcessDirsOnWait is false", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", signallerFactory, fakeCommandRunner, false, "exec")
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root", signallerFactory, fakeCommandRunner, false, "exec")
 			})
 
 			It("does not clean up the processes dir after Wait returns", func() {
@@ -1016,7 +1016,7 @@ var _ = Describe("Dadoo ExecRunner", func() {
 
 		Context("when no process with the specified ID exists", func() {
 			BeforeEach(func() {
-				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", signallerFactory, fakeCommandRunner, true, "exec")
+				runner = dadoo.NewExecRunner("path-to-dadoo", "path-to-runc", "runc-root", signallerFactory, fakeCommandRunner, true, "exec")
 			})
 
 			It("returns ProcessNotFoundError", func() {

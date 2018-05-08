@@ -39,9 +39,8 @@ func New(
 	mkdirer Mkdirer, userLookuper UserLookupper, execRunner ExecRunner, uidGenerator UidGenerator,
 ) *RunRunc {
 	return &RunRunc{
-		Creator: NewCreator(runcPath, runcExtraArgs, runner),
-		Execer:  NewExecer(bundleLoader, processBuilder, mkdirer, userLookuper, execRunner, uidGenerator),
-
+		Creator:    NewCreator(runcPath, runcExtraArgs, runner),
+		Execer:     NewExecer(bundleLoader, processBuilder, mkdirer, userLookuper, execRunner, uidGenerator, FilePidGetter(GetFilePid)),
 		OomWatcher: NewOomWatcher(runner, runc),
 		Statser:    NewStatser(runcCmdRunner, runc),
 		Stater:     NewStater(runcCmdRunner, runc),

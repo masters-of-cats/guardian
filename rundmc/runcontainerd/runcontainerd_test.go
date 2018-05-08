@@ -17,13 +17,15 @@ var _ = Describe("Runcontainerd", func() {
 	var (
 		nerd          *runcontainerdfakes.FakeNerdContainerizer
 		bundleLoader  *runcontainerdfakes.FakeBundleLoader
+		execer        *runcontainerdfakes.FakeExecer
 		runContainerd *runcontainerd.RunContainerd
 	)
 
 	BeforeEach(func() {
 		nerd = new(runcontainerdfakes.FakeNerdContainerizer)
 		bundleLoader = new(runcontainerdfakes.FakeBundleLoader)
-		runContainerd = runcontainerd.New(nerd, bundleLoader)
+		execer = new(runcontainerdfakes.FakeExecer)
+		runContainerd = runcontainerd.New(nerd, bundleLoader, execer)
 	})
 
 	Describe("Create", func() {

@@ -1,6 +1,8 @@
 package goci
 
-import "os/exec"
+import (
+	"os/exec"
+)
 
 // The DefaultRuncBinary, i.e. 'runc'.
 var DefaultRuncBinary = RuncBinary{Path: "runc"}

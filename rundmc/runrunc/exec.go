@@ -82,6 +82,11 @@ type ProcessSpec struct {
 	ContainerGID int
 }
 
+//go:generate counterfeiter . PidGetter
+type PidGetter interface {
+	GetPid(bundlePath, containerId string) (uint32, error)
+}
+
 //go:generate counterfeiter . Waiter
 //go:generate counterfeiter . Runner
 
