@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 
 	"code.cloudfoundry.org/commandrunner"
-	"code.cloudfoundry.org/guardian/logging"
 	"code.cloudfoundry.org/guardian/rundmc"
 	"code.cloudfoundry.org/lager"
 )
@@ -313,19 +313,36 @@ func (s *CgroupStarter) idempotentCgroupMount(logger lager.Logger, cgroupPath, s
 		return fmt.Errorf("mkdir '%s': %s", cgroupPath, err)
 	}
 
-	mountPoint, err := s.MountPointChecker.IsMountPoint(cgroupPath)
+	err := unix.Mount("cgroup", cgroupPath, "cgroup", uintptr(0), subsystem)
 	if err != nil {
-		return err
-	}
-	if !mountPoint {
-		cmd := exec.Command("mount", "-n", "-t", "cgroup", "-o", subsystem, "cgroup", cgroupPath)
-		cmd.Stderr = logging.Writer(logger.Session("mount-cgroup-cmd"))
-		if err := s.CommandRunner.Run(cmd); err != nil {
+		switch err {
+		case unix.EBUSY:
+			println("---------> ", subsystem, ": got unix.EBUSY", err.Error())
+			mountPoint, checkErr := s.MountPointChecker.IsMountPoint(cgroupPath)
+			if checkErr != nil {
+				return checkErr
+			}
+			if mountPoint {
+				logger.Info("subsystem-already-mounted")
+			}
+		default:
 			return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
 		}
-	} else {
-		logger.Info("subsystem-already-mounted")
 	}
+
+	// mountPoint, err := s.MountPointChecker.IsMountPoint(cgroupPath)
+	// if err != nil {
+	// 	return err
+	// }
+	// if !mountPoint {
+	// 	cmd := exec.Command("mount", "-n", "-t", "cgroup", "-o", subsystem, "cgroup", cgroupPath)
+	// 	cmd.Stderr = logging.Writer(logger.Session("mount-cgroup-cmd"))
+	// 	if err := s.CommandRunner.Run(cmd); err != nil {
+	// 		return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
+	// 	}
+	// } else {
+	// 	logger.Info("subsystem-already-mounted")
+	// }
 
 	logger.Info("finished")
 

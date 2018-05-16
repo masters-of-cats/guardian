@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"code.cloudfoundry.org/commandrunner/fake_command_runner"
 	. "code.cloudfoundry.org/commandrunner/fake_command_runner/matchers"
@@ -83,6 +84,7 @@ var _ = Describe("CgroupStarter", func() {
 			Logger:            logger,
 			Chowner:           chowner,
 			MountPointChecker: mountPointChecker.Spy,
+			// MountPointChecker: rundmc.IsMountPoint,
 		}
 	})
 
@@ -234,12 +236,13 @@ var _ = Describe("CgroupStarter", func() {
 				}
 			})
 
-			It("changes the permissions of the subdirectories", func() {
-				starter.Start()
+			FIt("changes the permissions of the subdirectories", func() {
+				Expect(starter.Start()).To(Succeed())
 				for _, subsystem := range []string{"devices", "cpu", "memory"} {
 					fullPath := path.Join(tmpDir, "cgroup", subsystem, "garden")
 					dirStat, err := os.Stat(fullPath)
 					Expect(err).NotTo(HaveOccurred())
+					time.Sleep(time.Hour)
 					Expect(dirStat.Mode() & os.ModePerm).To(Equal(os.FileMode(0755)))
 				}
 			})
