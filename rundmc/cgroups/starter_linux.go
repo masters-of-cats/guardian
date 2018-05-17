@@ -29,6 +29,9 @@ type CgroupsFormatError struct {
 	Content string
 }
 
+//go:generate counterfeiter . MountFunc
+type MountFunc func(source, target string, fstype string, flags uintptr, data string) error
+
 func (err CgroupsFormatError) Error() string {
 	return fmt.Sprintf("unknown /proc/cgroups format: %s", err.Content)
 }
@@ -54,6 +57,8 @@ func NewStarter(
 		Logger:            logger,
 		Chowner:           chowner,
 		MountPointChecker: mountPointChecker,
+
+		Mount: unix.Mount,
 	}
 }
 
@@ -69,6 +74,8 @@ type CgroupStarter struct {
 	Logger            lager.Logger
 	Chowner           Chowner
 	MountPointChecker rundmc.MountPointChecker
+
+	Mount MountFunc
 }
 
 func (s *CgroupStarter) Start() error {
@@ -313,18 +320,18 @@ func (s *CgroupStarter) idempotentCgroupMount(logger lager.Logger, cgroupPath, s
 		return fmt.Errorf("mkdir '%s': %s", cgroupPath, err)
 	}
 
-	err := unix.Mount("cgroup", cgroupPath, "cgroup", uintptr(0), subsystem)
+	err := s.Mount("cgroup", cgroupPath, "cgroup", uintptr(0), subsystem)
 	switch err {
 	case nil:
-		break
 	case unix.EBUSY:
 		mountPoint, checkErr := s.MountPointChecker.IsMountPoint(cgroupPath)
 		if checkErr != nil {
 			return checkErr
 		}
-		if mountPoint {
-			logger.Info("subsystem-already-mounted")
+		if !mountPoint {
+			return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
 		}
+		logger.Info("subsystem-already-mounted")
 	default:
 		return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
 	}

@@ -5,22 +5,25 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"code.cloudfoundry.org/commandrunner/fake_command_runner"
 	. "code.cloudfoundry.org/commandrunner/fake_command_runner/matchers"
+	"code.cloudfoundry.org/guardian/rundmc"
 	"code.cloudfoundry.org/guardian/rundmc/cgroups"
 	fakes "code.cloudfoundry.org/guardian/rundmc/cgroups/cgroupsfakes"
 	"code.cloudfoundry.org/guardian/rundmc/rundmcfakes"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
+	"github.com/docker/docker/pkg/mount"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 )
 
-var _ = Describe("CgroupStarter", func() {
+var _ = FDescribe("CgroupStarter", func() {
 	var (
 		runner                    *fake_command_runner.FakeCommandRunner
 		starter                   *cgroups.CgroupStarter
@@ -69,26 +72,34 @@ var _ = Describe("CgroupStarter", func() {
 			return true, nil
 		}
 
-		starter = &cgroups.CgroupStarter{
-			CgroupPath:   path.Join(tmpDir, "cgroup"),
-			GardenCgroup: "garden",
-			AllowedDevices: []specs.LinuxDeviceCgroup{{
+		starter = cgroups.NewStarter(
+			logger,
+			ioutil.NopCloser(strings.NewReader(procCgroupsContents)),
+			ioutil.NopCloser(strings.NewReader(procSelfCgroupsContents)),
+			path.Join(tmpDir, "cgroup"),
+			"garden",
+			[]specs.LinuxDeviceCgroup{{
 				Type:   "c",
 				Major:  int64ptr(10),
 				Minor:  int64ptr(200),
 				Access: "rwm",
 			}},
-			CommandRunner:     runner,
-			ProcCgroups:       ioutil.NopCloser(strings.NewReader(procCgroupsContents)),
-			ProcSelfCgroups:   ioutil.NopCloser(strings.NewReader(procSelfCgroupsContents)),
-			Logger:            logger,
-			Chowner:           chowner,
-			MountPointChecker: mountPointChecker.Spy,
-			// MountPointChecker: rundmc.IsMountPoint,
-		}
+			runner,
+			chowner,
+			mountPointChecker.Spy,
+		)
 	})
 
 	AfterEach(func() {
+		infos, err := ioutil.ReadDir(filepath.Join(tmpDir, "cgroup"))
+		Expect(err).NotTo(HaveOccurred())
+		for _, i := range infos {
+			err = unix.Unmount(filepath.Join(tmpDir, "cgroup", i.Name()), 0)
+			if err != nil && err != unix.EINVAL {
+				Fail(err.Error())
+			}
+		}
+
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
 
@@ -120,12 +131,10 @@ var _ = Describe("CgroupStarter", func() {
 			Expect(os.MkdirAll(path.Join(tmpDir, "cgroup", "devices", "garden", "child"), 0777)).To(Succeed())
 		})
 
-		It("does not write to devices.deny", func() {
+		It("does not fail", func() {
+			// It is not valid to write "a" to devices.deny of a cgroup with a child
 			Expect(starter.Start()).To(Succeed())
-			Expect(path.Join(tmpDir, "cgroup", "devices", "garden")).To(BeADirectory())
-			Expect(path.Join(tmpDir, "cgroup", "devices", "garden", "devices.deny")).NotTo(BeAnExistingFile())
 		})
-
 	})
 
 	Context("when the cgroup path is not a mountpoint", func() {
@@ -162,7 +171,7 @@ var _ = Describe("CgroupStarter", func() {
 		})
 	})
 
-	Context("with a sane /proc/cgroups and /proc/self/cgroup", func() {
+	Context("when on Xenial", func() {
 		BeforeEach(func() {
 			procCgroupsContents = "#subsys_name\thierarchy\tnum_cgroups\tenabled\n" +
 				"devices\t1\t1\t1\n" +
@@ -176,33 +185,35 @@ var _ = Describe("CgroupStarter", func() {
 
 			notMountedCgroups = []string{"devices", "cpu", "cpuacct"}
 		})
+		// TODO
+	})
+
+	Context("with a sane /proc/cgroups and /proc/self/cgroup", func() {
+		BeforeEach(func() {
+			procCgroupsContents = "#subsys_name\thierarchy\tnum_cgroups\tenabled\n" +
+				"devices\t1\t1\t1\n" +
+				"memory\t2\t1\t1\n" +
+				"cpu\t3\t1\t1\n"
+
+			procSelfCgroupsContents = "5:devices:/\n" +
+				"4:memory:/\n" +
+				"3:cpu:/\n"
+
+			notMountedCgroups = []string{"devices", "cpu"}
+		})
 
 		It("succeeds", func() {
 			Expect(starter.Start()).To(Succeed())
 		})
 
 		It("mounts the hierarchies which are not already mounted", func() {
-			starter.Start()
+			Expect(starter.Start()).To(Succeed())
 
-			Expect(runner).To(HaveExecutedSerially(fake_command_runner.CommandSpec{
-				Path: "mount",
-				Args: []string{"-n", "-t", "cgroup", "-o", "devices", "cgroup", path.Join(tmpDir, "cgroup", "devices")},
-			}))
-
-			Expect(runner).NotTo(HaveExecutedSerially(fake_command_runner.CommandSpec{
-				Path: "mount",
-				Args: []string{"-n", "-t", "cgroup", "-o", "memory", "cgroup", path.Join(tmpDir, "cgroup", "memory")},
-			}))
-
-			Expect(runner).To(HaveExecutedSerially(fake_command_runner.CommandSpec{
-				Path: "mount",
-				Args: []string{"-n", "-t", "cgroup", "-o", "cpu,cpuacct", "cgroup", path.Join(tmpDir, "cgroup", "cpu")},
-			}))
-
-			Expect(runner).To(HaveExecutedSerially(fake_command_runner.CommandSpec{
-				Path: "mount",
-				Args: []string{"-n", "-t", "cgroup", "-o", "cpu,cpuacct", "cgroup", path.Join(tmpDir, "cgroup", "cpuacct")},
-			}))
+			expectToBeMountedAsCgroup(
+				path.Join(tmpDir, "cgroup", "devices"),
+				path.Join(tmpDir, "cgroup", "memory"),
+				path.Join(tmpDir, "cgroup", "cpu"),
+			)
 		})
 
 		It("creates needed directories", func() {
@@ -236,13 +247,12 @@ var _ = Describe("CgroupStarter", func() {
 				}
 			})
 
-			FIt("changes the permissions of the subdirectories", func() {
+			It("changes the permissions of the subdirectories", func() {
 				Expect(starter.Start()).To(Succeed())
 				for _, subsystem := range []string{"devices", "cpu", "memory"} {
 					fullPath := path.Join(tmpDir, "cgroup", subsystem, "garden")
 					dirStat, err := os.Stat(fullPath)
 					Expect(err).NotTo(HaveOccurred())
-					time.Sleep(time.Hour)
 					Expect(dirStat.Mode() & os.ModePerm).To(Equal(os.FileMode(0755)))
 				}
 			})
@@ -284,10 +294,7 @@ var _ = Describe("CgroupStarter", func() {
 
 			It("mounts it as its own subsystem", func() {
 				Expect(starter.Start()).To(Succeed())
-				Expect(runner).To(HaveExecutedSerially(fake_command_runner.CommandSpec{
-					Path: "mount",
-					Args: []string{"-n", "-t", "cgroup", "-o", "freezer", "cgroup", path.Join(tmpDir, "cgroup", "freezer")},
-				}))
+				expectToBeMountedAsCgroup(path.Join(tmpDir, "cgroup", "freezer"))
 			})
 		})
 
@@ -404,4 +411,21 @@ func readFile(path string) []byte {
 
 func int64ptr(i int64) *int64 {
 	return &i
+}
+
+func expectToBeMountedAsCgroup(paths ...string) {
+	mounts, err := mount.GetMounts()
+	Expect(err).NotTo(HaveOccurred())
+
+	mountsMap := make(map[string]*mount.Info)
+	for _, m := range mounts {
+		mountsMap[m.Root] = m
+	}
+
+	for _, p := range paths {
+		mounted, err := rundmc.IsMountPoint(p)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+		ExpectWithOffset(1, mounted).To(BeTrue(), p)
+		Expect(mountsMap[p].Source).To(Equal("cgroup"))
+	}
 }
