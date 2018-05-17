@@ -314,20 +314,19 @@ func (s *CgroupStarter) idempotentCgroupMount(logger lager.Logger, cgroupPath, s
 	}
 
 	err := unix.Mount("cgroup", cgroupPath, "cgroup", uintptr(0), subsystem)
-	if err != nil {
-		switch err {
-		case unix.EBUSY:
-			println("---------> ", subsystem, ": got unix.EBUSY", err.Error())
-			mountPoint, checkErr := s.MountPointChecker.IsMountPoint(cgroupPath)
-			if checkErr != nil {
-				return checkErr
-			}
-			if mountPoint {
-				logger.Info("subsystem-already-mounted")
-			}
-		default:
-			return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
+	switch err {
+	case nil:
+		break
+	case unix.EBUSY:
+		mountPoint, checkErr := s.MountPointChecker.IsMountPoint(cgroupPath)
+		if checkErr != nil {
+			return checkErr
 		}
+		if mountPoint {
+			logger.Info("subsystem-already-mounted")
+		}
+	default:
+		return fmt.Errorf("mounting subsystem '%s' in '%s': %s", subsystem, cgroupPath, err)
 	}
 
 	// mountPoint, err := s.MountPointChecker.IsMountPoint(cgroupPath)
