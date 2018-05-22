@@ -14,7 +14,6 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 
-	"code.cloudfoundry.org/guardian/rundmc"
 	"code.cloudfoundry.org/guardian/rundmc/cgroups/fs"
 	"code.cloudfoundry.org/lager"
 )
@@ -40,17 +39,15 @@ func NewStarter(
 	cgroupMountpoint string,
 	gardenCgroup string,
 	allowedDevices []specs.LinuxDeviceCgroup,
-	mountPointChecker rundmc.MountPointChecker,
 ) *CgroupStarter {
 	return &CgroupStarter{
-		CgroupPath:        cgroupMountpoint,
-		GardenCgroup:      gardenCgroup,
-		ProcCgroups:       procCgroupReader,
-		ProcSelfCgroups:   procSelfCgroupReader,
-		AllowedDevices:    allowedDevices,
-		Logger:            logger,
-		MountPointChecker: mountPointChecker,
-		FS:                fs.Functions(),
+		CgroupPath:      cgroupMountpoint,
+		GardenCgroup:    gardenCgroup,
+		ProcCgroups:     procCgroupReader,
+		ProcSelfCgroups: procSelfCgroupReader,
+		AllowedDevices:  allowedDevices,
+		Logger:          logger,
+		FS:              fs.Functions(),
 	}
 }
 
@@ -61,9 +58,8 @@ type CgroupStarter struct {
 	ProcCgroups     io.ReadCloser
 	ProcSelfCgroups io.ReadCloser
 
-	Logger            lager.Logger
-	MountPointChecker rundmc.MountPointChecker
-	FS                fs.FS
+	Logger lager.Logger
+	FS     fs.FS
 
 	uid *int
 	gid *int
@@ -90,15 +86,7 @@ func (s *CgroupStarter) mountCgroupsIfNeeded(logger lager.Logger) error {
 		return err
 	}
 
-	mountPoint, err := s.MountPointChecker.IsMountPoint(s.CgroupPath)
-	if err != nil {
-		return err
-	}
-	if !mountPoint {
-		s.mountTmpfsOnCgroupPath(logger, s.CgroupPath)
-	} else {
-		logger.Info("cgroups-tmpfs-already-mounted", lager.Data{"path": s.CgroupPath})
-	}
+	s.mountTmpfsOnCgroupPath(logger, s.CgroupPath)
 
 	subsystemGroupings, err := s.subsystemGroupings()
 	if err != nil {
@@ -277,12 +265,12 @@ func (s *CgroupStarter) createGardenCgroup(log lager.Logger, gardenCgroupPath st
 func (s *CgroupStarter) mountTmpfsOnCgroupPath(log lager.Logger, path string) {
 	log = log.Session("cgroups-tmpfs-mounting", lager.Data{"path": path})
 	log.Info("started")
+	defer log.Info("finished")
 
 	if err := s.FS.Mount("cgroup", path, "tmpfs", uintptr(0), "uid=0,gid=0,mode=0755"); err != nil {
 		log.Error("mount-failed-continuing-anyway", err)
 		return
 	}
-	log.Info("finished")
 }
 
 type group struct {

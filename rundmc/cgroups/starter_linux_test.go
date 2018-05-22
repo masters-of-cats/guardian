@@ -1,7 +1,6 @@
 package cgroups_test
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"path"
@@ -10,7 +9,6 @@ import (
 
 	"code.cloudfoundry.org/guardian/rundmc/cgroups"
 	"code.cloudfoundry.org/guardian/rundmc/cgroups/fs/fsfakes"
-	"code.cloudfoundry.org/guardian/rundmc/rundmcfakes"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
 	. "github.com/onsi/ginkgo"
@@ -21,17 +19,12 @@ import (
 
 var _ = Describe("CgroupStarter", func() {
 	var (
-		starter                   *cgroups.CgroupStarter
-		logger                    lager.Logger
-		mountPointChecker         *rundmcfakes.FakeMountPointChecker
-		fakeFS                    *fsfakes.FakeFS
-		procCgroupsContents       string
-		procSelfCgroupsContents   string
-		cgroupPathMounted         bool
-		cgroupPathMountCheckError error
-		notMountedCgroups         []string
-
-		tmpDir string
+		starter                 *cgroups.CgroupStarter
+		logger                  lager.Logger
+		fakeFS                  *fsfakes.FakeFS
+		procCgroupsContents     string
+		procSelfCgroupsContents string
+		tmpDir                  string
 	)
 
 	BeforeEach(func() {
@@ -43,26 +36,9 @@ var _ = Describe("CgroupStarter", func() {
 
 		logger = lagertest.NewTestLogger("test")
 		fakeFS = new(fsfakes.FakeFS)
-		mountPointChecker = new(rundmcfakes.FakeMountPointChecker)
-		cgroupPathMounted = true
-		cgroupPathMountCheckError = nil
-		notMountedCgroups = []string{}
 	})
 
 	JustBeforeEach(func() {
-		mountPointChecker.Stub = func(p string) (bool, error) {
-			for _, notMounted := range notMountedCgroups {
-				if p == path.Join(tmpDir, "cgroup", notMounted) {
-					return false, nil
-				}
-			}
-
-			if p == path.Join(tmpDir, "cgroup") {
-				return cgroupPathMounted, cgroupPathMountCheckError
-			}
-
-			return true, nil
-		}
 
 		starter = cgroups.NewStarter(
 			logger,
@@ -76,7 +52,6 @@ var _ = Describe("CgroupStarter", func() {
 				Minor:  int64ptr(200),
 				Access: "rwm",
 			}},
-			mountPointChecker.Spy,
 		)
 		starter.FS = fakeFS
 	})
@@ -121,37 +96,9 @@ var _ = Describe("CgroupStarter", func() {
 
 	})
 
-	Context("when the cgroup path is not a mountpoint", func() {
-		BeforeEach(func() {
-			cgroupPathMounted = false
-		})
-
-		It("mounts it", func() {
-			Expect(starter.Start()).To(Succeed())
-
-			Expect(fakeFS.MountCallCount()).To(BeNumerically(">", 0))
-			expected := newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup"), "tmpfs", 0, "uid=0,gid=0,mode=0755")
-			Expect(newMountArgs(fakeFS.MountArgsForCall(0))).To(Equal(expected))
-		})
-	})
-
-	Context("when the cgroup path exists", func() {
-		It("does not mount it again", func() {
-			Expect(starter.Start()).To(Succeed())
-			for i := 0; i < fakeFS.MountCallCount(); i++ {
-				Expect(newMountArgs(fakeFS.MountArgsForCall(i)).target).NotTo(Equal(filepath.Join(tmpDir, "cgroup")))
-			}
-		})
-	})
-
-	Context("when there is an error checking for a mountpoint on Start", func() {
-		BeforeEach(func() {
-			cgroupPathMountCheckError = errors.New("mountpoint check error")
-		})
-
-		It("returns an error", func() {
-			Expect(starter.Start()).To(MatchError("mountpoint check error"))
-		})
+	It("mounts the cgroup tmpfs path", func() {
+		Expect(starter.Start()).To(Succeed())
+		expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup"), "tmpfs", 0, "uid=0,gid=0,mode=0755"))
 	})
 
 	Context("with a sane /proc/cgroups and /proc/self/cgroup", func() {
@@ -165,8 +112,6 @@ var _ = Describe("CgroupStarter", func() {
 			procSelfCgroupsContents = "5:devices:/\n" +
 				"4:memory:/\n" +
 				"3:cpu,cpuacct:/\n"
-
-			notMountedCgroups = []string{"devices", "cpu", "cpuacct"}
 		})
 
 		It("succeeds", func() {
@@ -176,19 +121,13 @@ var _ = Describe("CgroupStarter", func() {
 		It("mounts the hierarchies which are not already mounted", func() {
 			Expect(starter.Start()).To(Succeed())
 
-			Expect(fakeFS.MountCallCount()).To(Equal(4))
+			Expect(fakeFS.MountCallCount()).To(Equal(5))
 
-			expected := newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "devices"), "cgroup", 0, "devices")
-			Expect(newMountArgs(fakeFS.MountArgsForCall(0))).To(Equal(expected))
-
-			expected = newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "memory"), "cgroup", 0, "memory")
-			Expect(newMountArgs(fakeFS.MountArgsForCall(1))).To(Equal(expected))
-
-			expected = newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "cpu"), "cgroup", 0, "cpu,cpuacct")
-			Expect(newMountArgs(fakeFS.MountArgsForCall(2))).To(Equal(expected))
-
-			expected = newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "cpuacct"), "cgroup", 0, "cpu,cpuacct")
-			Expect(newMountArgs(fakeFS.MountArgsForCall(3))).To(Equal(expected))
+			expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup"), "tmpfs", 0, "uid=0,gid=0,mode=0755"))
+			expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "devices"), "cgroup", 0, "devices"))
+			expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "memory"), "cgroup", 0, "memory"))
+			expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "cpu"), "cgroup", 0, "cpu,cpuacct"))
+			expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "cpuacct"), "cgroup", 0, "cpu,cpuacct"))
 		})
 
 		It("creates needed directories", func() {
@@ -238,7 +177,6 @@ var _ = Describe("CgroupStarter", func() {
 					"memory\t2\t1\t1\n"
 
 				procSelfCgroupsContents = "4:memory:/461299e6-b672-497c-64e5-793494b9bbdb\n"
-				notMountedCgroups = []string{"memory"}
 			})
 
 			It("creates subdirectories owned by the specified user and group", func() {
@@ -264,14 +202,11 @@ var _ = Describe("CgroupStarter", func() {
 			BeforeEach(func() {
 				procCgroupsContents = "#subsys_name\thierarchy\tnum_cgroups\tenabled\n" +
 					"freezer\t7\t1\t1\n"
-				notMountedCgroups = []string{"freezer"}
 			})
 
 			It("mounts it as its own subsystem", func() {
 				Expect(starter.Start()).To(Succeed())
-				Expect(fakeFS.MountCallCount()).To(Equal(1))
-				expected := newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "freezer"), "cgroup", 0, "freezer")
-				Expect(newMountArgs(fakeFS.MountArgsForCall(0))).To(Equal(expected))
+				expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "freezer"), "cgroup", 0, "freezer"))
 			})
 		})
 
@@ -279,12 +214,11 @@ var _ = Describe("CgroupStarter", func() {
 			BeforeEach(func() {
 				procCgroupsContents = "#subsys_name\thierarchy\tnum_cgroups\tenabled\n" +
 					"freezer\t7\t1\t0\n"
-				notMountedCgroups = []string{"freezer"}
 			})
 
 			It("skips it", func() {
 				Expect(starter.Start()).To(Succeed())
-				Expect(fakeFS.MountCallCount()).To(Equal(0))
+				expectNotMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "freezer"), "cgroup", 0, "freezer"))
 			})
 		})
 
@@ -293,30 +227,9 @@ var _ = Describe("CgroupStarter", func() {
 				procSelfCgroupsContents = procSelfCgroupsContents + "1:name=systemd:/\n"
 			})
 
-			Context("when the named cgroup is already mounted", func() {
-				BeforeEach(func() {
-					notMountedCgroups = []string{}
-				})
-
-				It("does not mount it again", func() {
-					Expect(fakeFS.MountCallCount()).To(Equal(0))
-				})
-			})
-
-			Context("when the named cgroup is not mounted", func() {
-				BeforeEach(func() {
-					notMountedCgroups = []string{"systemd"}
-				})
-
-				It("mounts it with name option as its own subsystem", func() {
-					Expect(starter.Start()).To(Succeed())
-					Expect(fakeFS.MountCallCount()).To(BeNumerically(">", 0))
-					var mountArgs []mountArgs
-					for i := 0; i < fakeFS.MountCallCount(); i++ {
-						mountArgs = append(mountArgs, newMountArgs(fakeFS.MountArgsForCall(i)))
-					}
-					Expect(mountArgs).To(ContainElement(newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "systemd"), "cgroup", 0, "name=systemd")))
-				})
+			It("mounts it with name option as its own subsystem", func() {
+				Expect(starter.Start()).To(Succeed())
+				expectMounted(fakeFS, newMountArgs("cgroup", filepath.Join(tmpDir, "cgroup", "systemd"), "cgroup", 0, "name=systemd"))
 			})
 		})
 
@@ -342,7 +255,6 @@ var _ = Describe("CgroupStarter", func() {
 			procSelfCgroupsContents = "5:devices:/\n" +
 				"4:memory:/\n" +
 				"3:cpu,cpuacct:/\n"
-			notMountedCgroups = []string{"devices", "cpu", "cpuacct"}
 		})
 
 		It("returns CgroupsFormatError", func() {
@@ -385,3 +297,20 @@ var _ = Describe("CgroupStarter", func() {
 		})
 	})
 })
+
+func expectNotMounted(fakeFS *fsfakes.FakeFS, mntArgs mountArgs) {
+	Expect(allMountArguments(fakeFS)).NotTo(ContainElement(mntArgs))
+}
+
+func expectMounted(fakeFS *fsfakes.FakeFS, mntArgs mountArgs) {
+	Expect(allMountArguments(fakeFS)).To(ContainElement(mntArgs))
+}
+
+func allMountArguments(fakeFS *fsfakes.FakeFS) []mountArgs {
+	Expect(fakeFS.MountCallCount()).To(BeNumerically(">", 0))
+	var allMntArgs []mountArgs
+	for i := 0; i < fakeFS.MountCallCount(); i++ {
+		allMntArgs = append(allMntArgs, newMountArgs(fakeFS.MountArgsForCall(i)))
+	}
+	return allMntArgs
+}

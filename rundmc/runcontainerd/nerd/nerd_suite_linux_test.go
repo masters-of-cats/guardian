@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"code.cloudfoundry.org/guardian/gqt/containerdrunner"
-	"code.cloudfoundry.org/guardian/rundmc"
 	"code.cloudfoundry.org/guardian/rundmc/cgroups"
 	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/burntsushi/toml"
@@ -93,7 +92,6 @@ func setupCgroups(cgroupsRoot string) {
 		cgroupsRoot,
 		"nerd",
 		[]specs.LinuxDeviceCgroup{},
-		rundmc.IsMountPoint,
 	)
 
 	Expect(starter.Start()).To(Succeed())

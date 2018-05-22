@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 func GetCGroupPath(cgroupsRoot, subsystem, tag string, privileged bool) (string, error) {
@@ -50,8 +52,23 @@ func CleanGardenCgroups(cGroupsPath, tag string) error {
 			}
 			return fmt.Errorf("%s: %s", rmErr, procInfo)
 		}
+
+		if err = unmountSafely(filepath.Join(cGroupsPath, subsystem.Name())); err != nil {
+			return fmt.Errorf("Failed to unmount %s : %s", cGroupPath, err)
+		}
 	}
 
+	if err = unmountSafely(cGroupsPath); err != nil {
+		return fmt.Errorf("Failed to unmount %s : %s", cGroupsPath, err)
+	}
+
+	return nil
+}
+
+func unmountSafely(path string) error {
+	if err := unix.Unmount(path, unix.MNT_FORCE); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Failed to unmount %s : %s", path, err)
+	}
 	return nil
 }
 

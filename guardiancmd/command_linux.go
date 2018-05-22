@@ -114,11 +114,11 @@ func (f *LinuxFactory) WireExecRunner(runMode, runcRoot string) runrunc.ExecRunn
 }
 
 func (f *LinuxFactory) WireCgroupsStarter(logger lager.Logger) gardener.Starter {
-	return createCgroupsStarter(logger, f.config.Server.Tag, "", rundmc.IsMountPoint)
+	return createCgroupsStarter(logger, f.config.Server.Tag, f.config.Server.CgroupRoot)
 }
 
 func (cmd *SetupCommand) WireCgroupsStarter(logger lager.Logger) gardener.Starter {
-	starter := createCgroupsStarter(logger, cmd.Tag, cmd.CgroupRoot, rundmc.IsMountPoint)
+	starter := createCgroupsStarter(logger, cmd.Tag, cmd.CgroupRoot)
 
 	if cmd.RootlessUID != nil {
 		starter = starter.WithUID(*cmd.RootlessUID)
@@ -131,7 +131,7 @@ func (cmd *SetupCommand) WireCgroupsStarter(logger lager.Logger) gardener.Starte
 	return starter
 }
 
-func createCgroupsStarter(logger lager.Logger, tag, cgroupRoot string, mountPointChecker rundmc.MountPointChecker) *cgroups.CgroupStarter {
+func createCgroupsStarter(logger lager.Logger, tag, cgroupRoot string) *cgroups.CgroupStarter {
 	cgroupsMountpoint := cgroups.CgroupRoot
 	gardenCgroup := cgroups.GardenCgroup
 	if tag != "" {
@@ -142,7 +142,7 @@ func createCgroupsStarter(logger lager.Logger, tag, cgroupRoot string, mountPoin
 	}
 
 	return cgroups.NewStarter(logger, mustOpen("/proc/cgroups"), mustOpen("/proc/self/cgroup"),
-		cgroupsMountpoint, gardenCgroup, allowedDevices, mountPointChecker)
+		cgroupsMountpoint, gardenCgroup, allowedDevices)
 }
 
 func (f *LinuxFactory) WireResolvConfigurer() kawasaki.DnsResolvConfigurer {
@@ -188,10 +188,10 @@ func privilegedMounts() []specs.Mount {
 	}
 }
 
-func unprivilegedMounts() []specs.Mount {
+func (cmd *ServerCommand) unprivilegedMounts() []specs.Mount {
 	return []specs.Mount{
 		{Type: "proc", Source: "proc", Destination: "/proc", Options: []string{"nosuid", "noexec", "nodev"}},
-		{Type: "cgroup", Source: "cgroup", Destination: "/sys/fs/cgroup", Options: []string{"ro", "nosuid", "noexec", "nodev"}},
+		{Type: "cgroup", Source: "cgroup", Destination: cmd.Server.CgroupRoot, Options: []string{"ro", "nosuid", "noexec", "nodev"}},
 	}
 }
 
