@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/garden"
+	"code.cloudfoundry.org/guardian/gqt/containerdrunner"
 	"code.cloudfoundry.org/guardian/gqt/runner"
 	"code.cloudfoundry.org/guardian/kawasaki/iptables"
 	"code.cloudfoundry.org/guardian/pkg/locksmith"
@@ -30,6 +31,8 @@ var (
 	unprivilegedGID = uint32(5000)
 
 	config            runner.GdnRunnerConfig
+	containerdConfig  containerdrunner.Config
+	containerdSession *gexec.Session
 	binaries          runner.Binaries
 	defaultTestRootFS string
 )
@@ -84,6 +87,11 @@ var _ = BeforeEach(func() {
 	}
 
 	config = defaultConfig()
+	runDir, err := ioutil.TempDir("", "")
+	Expect(err).NotTo(HaveOccurred())
+	containerdConfig = containerdrunner.ContainerdConfig(runDir)
+	config.ContainerdSocket = containerdConfig.GRPC.Address
+	containerdSession = containerdrunner.NewSession(runDir, containerdConfig)
 	if runtime.GOOS == "linux" {
 		initGrootStore(config.ImagePluginBin, config.StorePath, []string{"0:4294967294:1", "1:65536:4294901758"})
 		initGrootStore(config.PrivilegedImagePluginBin, config.PrivilegedStorePath, nil)
@@ -91,6 +99,8 @@ var _ = BeforeEach(func() {
 })
 
 var _ = AfterEach(func() {
+	Expect(containerdSession.Terminate().Wait()).To(gexec.Exit(0))
+
 	// Windows worker is not containerised and therefore the test needs to take care to delete the temporary folder
 	if runtime.GOOS == "windows" {
 		Expect(os.RemoveAll(config.TmpDir)).To(Succeed())
