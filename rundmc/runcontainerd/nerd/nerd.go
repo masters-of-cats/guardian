@@ -13,15 +13,25 @@ import (
 )
 
 type Nerd struct {
+	socket  string
 	client  *containerd.Client
 	context context.Context
 }
 
-func New(client *containerd.Client, context context.Context) *Nerd {
+func New(containerdSocket string, context context.Context) *Nerd {
 	return &Nerd{
-		client:  client,
+		socket:  containerdSocket,
 		context: context,
 	}
+}
+
+func (n *Nerd) getClient() (*containerd.Client, error) {
+	if n.client != nil {
+		return n.client, nil
+	}
+	var err error
+	n.client, err = containerd.New(n.socket)
+	return n.client, err
 }
 
 func WithNoNewKeyring(ctx context.Context, c *containerd.Client, ti *containerd.TaskInfo) error {
@@ -31,7 +41,11 @@ func WithNoNewKeyring(ctx context.Context, c *containerd.Client, ti *containerd.
 
 func (n *Nerd) Create(log lager.Logger, containerID string, spec *specs.Spec) error {
 	log.Debug("creating-container", lager.Data{"containerID": containerID})
-	container, err := n.client.NewContainer(n.context, containerID, containerd.WithSpec(spec))
+	client, err := n.getClient()
+	if err != nil {
+		return err
+	}
+	container, err := client.NewContainer(n.context, containerID, containerd.WithSpec(spec))
 	if err != nil {
 		return err
 	}
@@ -48,7 +62,11 @@ func (n *Nerd) Create(log lager.Logger, containerID string, spec *specs.Spec) er
 
 func (n *Nerd) Delete(log lager.Logger, containerID string) error {
 	log.Debug("loading-container", lager.Data{"containerID": containerID})
-	container, err := n.client.LoadContainer(n.context, containerID)
+	client, err := n.getClient()
+	if err != nil {
+		return err
+	}
+	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return err
 	}
@@ -71,7 +89,11 @@ func (n *Nerd) Delete(log lager.Logger, containerID string) error {
 
 func (n *Nerd) State(log lager.Logger, containerID string) (int, containerd.ProcessStatus, error) {
 	log.Debug("loading-container", lager.Data{"containerID": containerID})
-	container, err := n.client.LoadContainer(n.context, containerID)
+	client, err := n.getClient()
+	if err != nil {
+		return 0, "", err
+	}
+	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return 0, "", err
 	}
@@ -94,7 +116,11 @@ func (n *Nerd) State(log lager.Logger, containerID string) (int, containerd.Proc
 
 func (n *Nerd) Exec(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) error {
 	log.Debug("loading-container", lager.Data{"containerID": containerID})
-	container, err := n.client.LoadContainer(n.context, containerID)
+	client, err := n.getClient()
+	if err != nil {
+		return err
+	}
+	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return err
 	}

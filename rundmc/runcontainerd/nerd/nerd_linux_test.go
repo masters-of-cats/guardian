@@ -32,7 +32,7 @@ var _ = Describe("Nerd", func() {
 
 	BeforeEach(func() {
 		testLogger = lagertest.NewTestLogger("nerd-test")
-		cnerd = nerd.New(containerdClient, containerdContext)
+		cnerd = nerd.New(containerdSocket, containerdContext)
 	})
 
 	Describe("Create", func() {
@@ -41,7 +41,7 @@ var _ = Describe("Nerd", func() {
 		})
 
 		It("creates the containerd container by id", func() {
-			spec := generateSpec(containerdContext, containerdClient, "test-container-id")
+			spec := generateSpec(containerdContext, "test-container-id")
 			Expect(cnerd.Create(testLogger, "test-container-id", spec)).To(Succeed())
 
 			containers := listContainers(testConfig.CtrBin, testConfig.Socket)
@@ -49,7 +49,7 @@ var _ = Describe("Nerd", func() {
 		})
 
 		It("starts an init process in the container", func() {
-			spec := generateSpec(containerdContext, containerdClient, "test-container-id")
+			spec := generateSpec(containerdContext, "test-container-id")
 			Expect(cnerd.Create(testLogger, "test-container-id", spec)).To(Succeed())
 
 			containers := listProcesses(testConfig.CtrBin, testConfig.Socket, "test-container-id")
@@ -59,7 +59,7 @@ var _ = Describe("Nerd", func() {
 
 	Describe("Exec", func() {
 		BeforeEach(func() {
-			spec := generateSpec(containerdContext, containerdClient, "test-container-id")
+			spec := generateSpec(containerdContext, "test-container-id")
 			Expect(cnerd.Create(testLogger, "test-container-id", spec)).To(Succeed())
 		})
 
@@ -133,7 +133,7 @@ var _ = Describe("Nerd", func() {
 
 	Describe("Delete", func() {
 		BeforeEach(func() {
-			spec := generateSpec(containerdContext, containerdClient, "test-container-id")
+			spec := generateSpec(containerdContext, "test-container-id")
 			Expect(cnerd.Create(testLogger, "test-container-id", spec)).To(Succeed())
 		})
 
@@ -147,7 +147,7 @@ var _ = Describe("Nerd", func() {
 
 	Describe("State", func() {
 		BeforeEach(func() {
-			spec := generateSpec(containerdContext, containerdClient, "test-container-id")
+			spec := generateSpec(containerdContext, "test-container-id")
 			Expect(cnerd.Create(testLogger, "test-container-id", spec)).To(Succeed())
 		})
 
@@ -177,8 +177,8 @@ func createRootfs(modifyRootfs func(string), perm os.FileMode) string {
 	return unpackedRootfs
 }
 
-func generateSpec(context context.Context, client *containerd.Client, containerID string) *specs.Spec {
-	spec, err := oci.GenerateSpec(context, client, &containers.Container{ID: containerID})
+func generateSpec(context context.Context, containerID string) *specs.Spec {
+	spec, err := oci.GenerateSpec(context, nil, &containers.Container{ID: containerID})
 	Expect(err).NotTo(HaveOccurred())
 	spec.Process.Args = []string{"sleep", "60"}
 	spec.Root = &specs.Root{

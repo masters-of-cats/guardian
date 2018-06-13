@@ -27,7 +27,6 @@ import (
 	"code.cloudfoundry.org/guardian/rundmc/signals"
 	"code.cloudfoundry.org/idmapper"
 	"code.cloudfoundry.org/lager"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/linux/proc"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/docker/pkg/mount"
@@ -227,12 +226,8 @@ func wireMounts() bundlerules.Mounts {
 }
 
 func wireContainerd(socket string, bndlLoader *goci.BndlLoader, processBuilder *processes.ProcBuilder, wireExecer func(pidGetter runrunc.PidGetter) *runrunc.Execer, statser runcontainerd.Statser, useContainerdForProcesses bool) (rundmc.OCIRuntime, peas.PidGetter, error) {
-	containerdClient, err := containerd.New(socket)
-	if err != nil {
-		return nil, nil, err
-	}
 	ctx := namespaces.WithNamespace(context.Background(), containerdNamespace)
-	nerd := nerd.New(containerdClient, ctx)
+	nerd := nerd.New(socket, ctx)
 	pidGetter := &runcontainerd.PidGetter{Nerd: nerd}
 
 	return runcontainerd.New(nerd, bndlLoader, processBuilder, wireExecer(pidGetter), statser, useContainerdForProcesses), pidGetter, nil

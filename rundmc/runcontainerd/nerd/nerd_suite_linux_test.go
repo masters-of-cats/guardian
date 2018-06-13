@@ -17,7 +17,6 @@ import (
 	"code.cloudfoundry.org/guardian/rundmc/cgroups"
 	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/burntsushi/toml"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,7 +35,7 @@ var (
 	cgroupsPath string
 
 	testConfig        *TestConfig
-	containerdClient  *containerd.Client
+	containerdSocket  string
 	containerdContext context.Context
 	containerdSession *gexec.Session
 )
@@ -63,8 +62,7 @@ var _ = BeforeEach(func() {
 	containerdConfig := containerdrunner.ContainerdConfig(runDir)
 	containerdSession = containerdrunner.NewSession(runDir, containerdConfig)
 
-	containerdClient, err = containerd.New(containerdConfig.GRPC.Address)
-	Expect(err).NotTo(HaveOccurred())
+	containerdSocket = containerdConfig.GRPC.Address
 
 	containerdContext = namespaces.WithNamespace(context.Background(), fmt.Sprintf("nerdspace%d", GinkgoParallelNode()))
 
