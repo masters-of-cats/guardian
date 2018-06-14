@@ -172,7 +172,7 @@ var _ = Describe("Creating a Container", func() {
 			Eventually(func() int { return numPipes(client.Pid) }).Should(Equal(initialPipes))
 		})
 
-		It("should not leak sockets", func() {
+		FIt("should not leak sockets", func() {
 			Expect(client.Destroy(container.Handle())).To(Succeed())
 			container = nil // avoid double-destroying
 

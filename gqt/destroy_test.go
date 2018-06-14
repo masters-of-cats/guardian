@@ -35,11 +35,15 @@ var _ = Describe("Destroying a Container", func() {
 		Expect(client.DestroyAndStop()).To(Succeed())
 	})
 
-	It("should not leak goroutines", func() {
+	FIt("should not leak goroutines", func() {
 		var numGoRoutines = func() int {
 			numGoroutines, err := client.NumGoroutines()
 			Expect(err).NotTo(HaveOccurred())
 			return numGoroutines
+		}
+
+		if isContainerd() {
+			client.Destroy("dummy-operation")
 		}
 
 		numGoroutinesBefore := numGoRoutines()
@@ -48,6 +52,7 @@ var _ = Describe("Destroying a Container", func() {
 		_, err := client.Create(garden.ContainerSpec{
 			Handle: handle,
 		})
+
 		Expect(err).NotTo(HaveOccurred())
 		Expect(client.Destroy(handle)).To(Succeed())
 

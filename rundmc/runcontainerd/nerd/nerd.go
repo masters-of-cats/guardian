@@ -40,11 +40,12 @@ func WithNoNewKeyring(ctx context.Context, c *containerd.Client, ti *containerd.
 }
 
 func (n *Nerd) Create(log lager.Logger, containerID string, spec *specs.Spec) error {
-	log.Debug("creating-container", lager.Data{"containerID": containerID})
 	client, err := n.getClient()
 	if err != nil {
 		return err
 	}
+
+	log.Debug("creating-container", lager.Data{"containerID": containerID})
 	container, err := client.NewContainer(n.context, containerID, containerd.WithSpec(spec))
 	if err != nil {
 		return err
@@ -61,11 +62,12 @@ func (n *Nerd) Create(log lager.Logger, containerID string, spec *specs.Spec) er
 }
 
 func (n *Nerd) Delete(log lager.Logger, containerID string) error {
-	log.Debug("loading-container", lager.Data{"containerID": containerID})
 	client, err := n.getClient()
 	if err != nil {
 		return err
 	}
+
+	log.Debug("loading-container", lager.Data{"containerID": containerID})
 	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return err
@@ -88,11 +90,13 @@ func (n *Nerd) Delete(log lager.Logger, containerID string) error {
 }
 
 func (n *Nerd) State(log lager.Logger, containerID string) (int, containerd.ProcessStatus, error) {
-	log.Debug("loading-container", lager.Data{"containerID": containerID})
+	log.Debug("getting-containerd-client")
 	client, err := n.getClient()
 	if err != nil {
 		return 0, "", err
 	}
+
+	log.Debug("loading-container", lager.Data{"containerID": containerID})
 	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return 0, "", err
@@ -115,11 +119,12 @@ func (n *Nerd) State(log lager.Logger, containerID string) (int, containerd.Proc
 }
 
 func (n *Nerd) Exec(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) error {
-	log.Debug("loading-container", lager.Data{"containerID": containerID})
 	client, err := n.getClient()
 	if err != nil {
 		return err
 	}
+
+	log.Debug("loading-container", lager.Data{"containerID": containerID})
 	container, err := client.LoadContainer(n.context, containerID)
 	if err != nil {
 		return err
