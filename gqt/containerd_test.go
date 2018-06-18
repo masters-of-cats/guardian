@@ -39,6 +39,28 @@ var _ = Describe("Containerd", func() {
 		})
 	})
 
+	Describe("creating a pea", func() {
+		FIt("creates a containerd container with running init task", func() {
+			container, err := client.Create(garden.ContainerSpec{})
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = container.Run(garden.ProcessSpec{
+				ID:    "ctrd-pea-id",
+				Image: garden.ImageRef{URI: createPeaRootfsTar()},
+				Path:  "/bin/sleep",
+				Args:  []string{"10"},
+				Dir:   "/",
+			}, garden.ProcessIO{})
+			Expect(err).NotTo(HaveOccurred())
+
+			containers := listContainers("ctr", config.ContainerdSocket)
+			Expect(containers).To(ContainSubstring("ctrd-pea-id"))
+
+			processes := listProcesses("ctr", config.ContainerdSocket, "ctrd-pea-id")
+			Expect(processes).To(ContainSubstring("ctrd-pea-id"))
+		})
+	})
+
 	Describe("destroying a container", func() {
 		var (
 			container garden.Container

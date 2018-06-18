@@ -36,6 +36,7 @@ import (
 	"code.cloudfoundry.org/guardian/rundmc/peas/privchecker"
 	"code.cloudfoundry.org/guardian/rundmc/preparerootfs"
 	"code.cloudfoundry.org/guardian/rundmc/processes"
+	"code.cloudfoundry.org/guardian/rundmc/runcontainerd"
 	"code.cloudfoundry.org/guardian/rundmc/runrunc"
 	"code.cloudfoundry.org/guardian/rundmc/runrunc/pid"
 	"code.cloudfoundry.org/guardian/rundmc/stopper"
@@ -876,11 +877,15 @@ func (cmd *ServerCommand) wireContainerizer(log lager.Logger, factory GardenFact
 
 	statser := runrunc.NewStatser(runcLogRunner, runcBinary)
 
+	var execRunner runrunc.ExecRunner
 	if cmd.useContainerd() {
 		var err error
 		runner, pidGetter, err = wireContainerd(cmd.Containerd.Socket, bndlLoader, processBuilder, userLookupper, wireExecerFunc, statser, cmd.Containerd.UseContainerdForProcesses)
 		if err != nil {
 			return nil, err
+		}
+		execRunner = &runcontainerd.RunContainerPea{
+			Creator: runner,
 		}
 	} else {
 		pidGetter = &pid.ContainerPidGetter{Depot: depot, PidFileReader: pidFileReader}
@@ -893,6 +898,7 @@ func (cmd *ServerCommand) wireContainerizer(log lager.Logger, factory GardenFact
 			wireExecerFunc(pidGetter),
 			statser,
 		)
+		execRunner = factory.WireExecRunner("run", runcRoot, uint32(uidMappings.Map(0)), uint32(gidMappings.Map(0)))
 	}
 
 	eventStore := rundmc.NewEventStore(properties)
@@ -906,7 +912,7 @@ func (cmd *ServerCommand) wireContainerizer(log lager.Logger, factory GardenFact
 		BundleGenerator:        template,
 		ProcessBuilder:         processBuilder,
 		BundleSaver:            bundleSaver,
-		ExecRunner:             factory.WireExecRunner("run", runcRoot, uint32(uidMappings.Map(0)), uint32(gidMappings.Map(0))),
+		ExecRunner:             execRunner,
 		RuncDeleter:            runcDeleter,
 		PeaCleaner:             peaCleaner,
 	}
