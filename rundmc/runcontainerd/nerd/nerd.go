@@ -78,19 +78,23 @@ func (n *Nerd) State(log lager.Logger, containerID string) (int, containerd.Proc
 	return int(task.Pid()), status.Status, nil
 }
 
-func (n *Nerd) Exec(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) error {
+func (n *Nerd) Exec(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) (*Process, error) {
 	_, task, err := n.loadContainerAndTask(log, containerID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Debug("execing-task", lager.Data{"containerID": containerID, "processID": processID})
 	process, err := task.Exec(n.context, processID, spec, cio.NewCreator(cio.WithStdio, withGardenProcessIO(io)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return process.Start(n.context)
+	if err := process.Start(n.context); err != nil {
+		return nil, err
+	}
+
+	return &Process{context: n.context, containerdProcess: process}, nil
 }
 
 func (n *Nerd) GetContainerPID(log lager.Logger, containerID string) (uint32, error) {
@@ -132,4 +136,19 @@ func (n *Nerd) loadContainerAndTask(log lager.Logger, containerID string) (conta
 	}
 
 	return container, task, nil
+}
+
+type Process struct {
+	context           context.Context
+	containerdProcess containerd.Process
+}
+
+func (p *Process) Wait() (int, error) {
+	exitCh, err := p.containerdProcess.Wait(p.context)
+	if err != nil {
+		return 0, err
+	}
+
+	exitStatus := <-exitCh
+	return int(exitStatus.ExitCode()), nil
 }

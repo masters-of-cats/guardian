@@ -337,7 +337,7 @@ var _ = Describe("Runcontainerd", func() {
 
 			Context("when nerd returns an error", func() {
 				BeforeEach(func() {
-					nerd.ExecReturns(errors.New("error-execing"))
+					nerd.ExecReturns(nil, errors.New("error-execing"))
 				})
 
 				It("returns the error", func() {

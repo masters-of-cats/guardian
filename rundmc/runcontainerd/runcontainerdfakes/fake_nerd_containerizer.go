@@ -6,6 +6,7 @@ import (
 
 	"code.cloudfoundry.org/garden"
 	"code.cloudfoundry.org/guardian/rundmc/runcontainerd"
+	"code.cloudfoundry.org/guardian/rundmc/runcontainerd/nerd"
 	"code.cloudfoundry.org/lager"
 	"github.com/containerd/containerd"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -37,7 +38,7 @@ type FakeNerdContainerizer struct {
 	deleteReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ExecStub        func(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) error
+	ExecStub        func(log lager.Logger, containerID, processID string, spec *specs.Process, io garden.ProcessIO) (*nerd.Process, error)
 	execMutex       sync.RWMutex
 	execArgsForCall []struct {
 		log         lager.Logger
@@ -47,10 +48,12 @@ type FakeNerdContainerizer struct {
 		io          garden.ProcessIO
 	}
 	execReturns struct {
-		result1 error
+		result1 *nerd.Process
+		result2 error
 	}
 	execReturnsOnCall map[int]struct {
-		result1 error
+		result1 *nerd.Process
+		result2 error
 	}
 	StateStub        func(log lager.Logger, containerID string) (int, containerd.ProcessStatus, error)
 	stateMutex       sync.RWMutex
@@ -185,7 +188,7 @@ func (fake *FakeNerdContainerizer) DeleteReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeNerdContainerizer) Exec(log lager.Logger, containerID string, processID string, spec *specs.Process, io garden.ProcessIO) error {
+func (fake *FakeNerdContainerizer) Exec(log lager.Logger, containerID string, processID string, spec *specs.Process, io garden.ProcessIO) (*nerd.Process, error) {
 	fake.execMutex.Lock()
 	ret, specificReturn := fake.execReturnsOnCall[len(fake.execArgsForCall)]
 	fake.execArgsForCall = append(fake.execArgsForCall, struct {
@@ -201,9 +204,9 @@ func (fake *FakeNerdContainerizer) Exec(log lager.Logger, containerID string, pr
 		return fake.ExecStub(log, containerID, processID, spec, io)
 	}
 	if specificReturn {
-		return ret.result1
+		return ret.result1, ret.result2
 	}
-	return fake.execReturns.result1
+	return fake.execReturns.result1, fake.execReturns.result2
 }
 
 func (fake *FakeNerdContainerizer) ExecCallCount() int {
@@ -218,23 +221,26 @@ func (fake *FakeNerdContainerizer) ExecArgsForCall(i int) (lager.Logger, string,
 	return fake.execArgsForCall[i].log, fake.execArgsForCall[i].containerID, fake.execArgsForCall[i].processID, fake.execArgsForCall[i].spec, fake.execArgsForCall[i].io
 }
 
-func (fake *FakeNerdContainerizer) ExecReturns(result1 error) {
+func (fake *FakeNerdContainerizer) ExecReturns(result1 *nerd.Process, result2 error) {
 	fake.ExecStub = nil
 	fake.execReturns = struct {
-		result1 error
-	}{result1}
+		result1 *nerd.Process
+		result2 error
+	}{result1, result2}
 }
 
-func (fake *FakeNerdContainerizer) ExecReturnsOnCall(i int, result1 error) {
+func (fake *FakeNerdContainerizer) ExecReturnsOnCall(i int, result1 *nerd.Process, result2 error) {
 	fake.ExecStub = nil
 	if fake.execReturnsOnCall == nil {
 		fake.execReturnsOnCall = make(map[int]struct {
-			result1 error
+			result1 *nerd.Process
+			result2 error
 		})
 	}
 	fake.execReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
+		result1 *nerd.Process
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeNerdContainerizer) State(log lager.Logger, containerID string) (int, containerd.ProcessStatus, error) {
