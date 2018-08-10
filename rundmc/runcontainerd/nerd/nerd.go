@@ -3,6 +3,7 @@ package nerd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/linux/runctypes"
+	"github.com/containerd/containerd/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -231,4 +233,13 @@ func (n *Nerd) Signal(log lager.Logger, containerID, processID string, signal sy
 	}
 
 	return process.Kill(n.context, signal)
+}
+
+func (n *Nerd) GetNamespace() (string, error) {
+	namespace, ok := namespaces.Namespace(n.context)
+	if !ok {
+		return "", errors.New("could not get namespace for container manager")
+	}
+
+	return namespace, nil
 }

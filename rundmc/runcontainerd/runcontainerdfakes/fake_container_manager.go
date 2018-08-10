@@ -81,6 +81,17 @@ type FakeContainerManager struct {
 		result1 uint32
 		result2 error
 	}
+	GetNamespaceStub        func() (string, error)
+	getNamespaceMutex       sync.RWMutex
+	getNamespaceArgsForCall []struct{}
+	getNamespaceReturns     struct {
+		result1 string
+		result2 error
+	}
+	getNamespaceReturnsOnCall map[int]struct {
+		result1 string
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -343,6 +354,49 @@ func (fake *FakeContainerManager) GetContainerPIDReturnsOnCall(i int, result1 ui
 	}{result1, result2}
 }
 
+func (fake *FakeContainerManager) GetNamespace() (string, error) {
+	fake.getNamespaceMutex.Lock()
+	ret, specificReturn := fake.getNamespaceReturnsOnCall[len(fake.getNamespaceArgsForCall)]
+	fake.getNamespaceArgsForCall = append(fake.getNamespaceArgsForCall, struct{}{})
+	fake.recordInvocation("GetNamespace", []interface{}{})
+	fake.getNamespaceMutex.Unlock()
+	if fake.GetNamespaceStub != nil {
+		return fake.GetNamespaceStub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fake.getNamespaceReturns.result1, fake.getNamespaceReturns.result2
+}
+
+func (fake *FakeContainerManager) GetNamespaceCallCount() int {
+	fake.getNamespaceMutex.RLock()
+	defer fake.getNamespaceMutex.RUnlock()
+	return len(fake.getNamespaceArgsForCall)
+}
+
+func (fake *FakeContainerManager) GetNamespaceReturns(result1 string, result2 error) {
+	fake.GetNamespaceStub = nil
+	fake.getNamespaceReturns = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeContainerManager) GetNamespaceReturnsOnCall(i int, result1 string, result2 error) {
+	fake.GetNamespaceStub = nil
+	if fake.getNamespaceReturnsOnCall == nil {
+		fake.getNamespaceReturnsOnCall = make(map[int]struct {
+			result1 string
+			result2 error
+		})
+	}
+	fake.getNamespaceReturnsOnCall[i] = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeContainerManager) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -356,6 +410,8 @@ func (fake *FakeContainerManager) Invocations() map[string][][]interface{} {
 	defer fake.stateMutex.RUnlock()
 	fake.getContainerPIDMutex.RLock()
 	defer fake.getContainerPIDMutex.RUnlock()
+	fake.getNamespaceMutex.RLock()
+	defer fake.getNamespaceMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

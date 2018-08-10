@@ -319,6 +319,20 @@ var _ = Describe("Nerd", func() {
 			})
 		})
 	})
+
+	FDescribe("GetNamespace", func() {
+		It("returns the namespace", func() {
+			namespace, err := cnerd.GetNamespace()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(namespace).To(Equal(fmt.Sprintf("nerdspace%d", GinkgoParallelNode())))
+		})
+
+		Context("when we create a nerd with no context", func() {
+			It("returns an error", func() {
+				Expect(nerd.New(containerdClient, nil).GetNamespace()).To(MatchError("could not get namespace for container manager"))
+			})
+		})
+	})
 })
 
 func createRootfs(modifyRootfs func(string), perm os.FileMode) string {

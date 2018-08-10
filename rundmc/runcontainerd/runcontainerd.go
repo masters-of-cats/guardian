@@ -29,6 +29,7 @@ type ContainerManager interface {
 
 	State(log lager.Logger, containerID string) (int, string, error)
 	GetContainerPID(log lager.Logger, containerID string) (uint32, error)
+	GetNamespace() (string, error)
 }
 
 //go:generate counterfeiter . ProcessManager
@@ -184,7 +185,12 @@ type containerState struct {
 }
 
 func (r *RunContainerd) writeUseHierarchy(handle string) error {
-	statePath := filepath.Join(proc.RuncRoot, "garden", handle, "state.json")
+	namespace, err := r.containerManager.GetNamespace()
+	if err != nil {
+		return err
+	}
+
+	statePath := filepath.Join(proc.RuncRoot, namespace, handle, "state.json")
 	stateFile, err := os.Open(statePath)
 	if err != nil {
 		return err
