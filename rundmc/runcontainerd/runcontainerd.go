@@ -1,8 +1,12 @@
 package runcontainerd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"syscall"
 
 	"code.cloudfoundry.org/garden"
@@ -11,6 +15,7 @@ import (
 	"code.cloudfoundry.org/guardian/rundmc/runrunc"
 	"code.cloudfoundry.org/guardian/rundmc/users"
 	"code.cloudfoundry.org/lager"
+	"github.com/containerd/containerd/linux/proc"
 	uuid "github.com/nu7hatch/gouuid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -85,7 +90,15 @@ func (r *RunContainerd) Create(log lager.Logger, bundlePath, id string, io garde
 		return err
 	}
 
-	return r.containerManager.Create(log, id, &bundle.Spec)
+	err = r.containerManager.Create(log, id, &bundle.Spec)
+	if err != nil {
+		return err
+	}
+
+	if r.useContainerdForProcesses {
+		return r.writeUseHierarchy(id)
+	}
+	return nil
 }
 
 func (r *RunContainerd) Exec(log lager.Logger, bundlePath, containerID string, gardenProcessSpec garden.ProcessSpec, gardenIO garden.ProcessIO) (garden.Process, error) {
@@ -160,4 +173,29 @@ func (r *RunContainerd) Stats(log lager.Logger, id string) (gardener.ActualConta
 
 func (r *RunContainerd) WatchEvents(log lager.Logger, id string, eventsNotifier runrunc.EventsNotifier) error {
 	return fmt.Errorf("WatchEvents is not implemented yet")
+}
+
+type cgroupPaths struct {
+	Memory string
+}
+
+type containerState struct {
+	CgroupPaths cgroupPaths `json:"cgroup_paths"`
+}
+
+func (r *RunContainerd) writeUseHierarchy(handle string) error {
+	statePath := filepath.Join(proc.RuncRoot, "garden", handle, "state.json")
+	stateFile, err := os.Open(statePath)
+	if err != nil {
+		return err
+	}
+	defer stateFile.Close()
+
+	var state containerState
+	err = json.NewDecoder(stateFile).Decode(&state)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filepath.Join(state.CgroupPaths.Memory, "memory.use_hierarchy"), []byte("1"), os.ModePerm)
 }

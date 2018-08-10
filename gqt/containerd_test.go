@@ -2,6 +2,7 @@ package gqt_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os/exec"
@@ -264,7 +265,7 @@ var _ = FDescribe("Containerd", func() {
 						Image: garden.ImageRef{URI: createPeaRootfsTar()},
 						Path:  "/bin/sleep",
 						Args:  []string{"10"},
-						// User:  "alice",
+						User:  "alice",
 					}, garden.ProcessIO{})
 					Expect(err).NotTo(HaveOccurred())
 
@@ -284,7 +285,7 @@ var _ = FDescribe("Containerd", func() {
 					Expect(code).To(Equal(0))
 				})
 
-				FIt("cleans up pea-debris", func() {
+				It("cleans up pea-debris", func() {
 					process, err := container.Run(garden.ProcessSpec{
 						ID:    "ctrd-pea-id-2",
 						Image: garden.ImageRef{URI: createPeaRootfsTar()},
@@ -300,11 +301,7 @@ var _ = FDescribe("Containerd", func() {
 
 					tasks := listTasks("ctr", config.ContainerdSocket)
 					Expect(tasks).NotTo(ContainSubstring("ctrd-pea-id-2"))
-
-					Expect(tasks).To(ContainSubstring(container.Handle()))
-					// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>", tasks)
-					// time.Sleep(time.Hour)
-					// Fail("ahhhhhh")
+					Expect(tasks).To(MatchRegexp(fmt.Sprintf(`%s\s+\d+\s+RUNNING`, container.Handle())))
 
 					containers := listContainers("ctr", config.ContainerdSocket)
 					Expect(containers).NotTo(ContainSubstring("ctrd-pea-id-2"))

@@ -161,14 +161,14 @@ func (c *Containerizer) Run(log lager.Logger, handle string, spec garden.Process
 	}
 
 	if spec.Image != (garden.ImageRef{}) {
-		// if shouldResolveUsername(spec.User) {
-		// 	resolvedUID, resolvedGID, err := c.peaUsernameResolver.ResolveUser(log, bundlePath, handle, spec.Image, spec.User)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		//
-		// 	spec.User = fmt.Sprintf("%d:%d", resolvedUID, resolvedGID)
-		// }
+		if shouldResolveUsername(spec.User) {
+			resolvedUID, resolvedGID, err := c.peaUsernameResolver.ResolveUser(log, bundlePath, handle, spec.Image, spec.User)
+			if err != nil {
+				return nil, err
+			}
+
+			spec.User = fmt.Sprintf("%d:%d", resolvedUID, resolvedGID)
+		}
 
 		spec.User = "0:0"
 		return c.peaCreator.CreatePea(log, spec, io, handle, bundlePath)
