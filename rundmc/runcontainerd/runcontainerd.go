@@ -1,12 +1,8 @@
 package runcontainerd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"syscall"
 
 	"code.cloudfoundry.org/garden"
@@ -15,7 +11,6 @@ import (
 	"code.cloudfoundry.org/guardian/rundmc/runrunc"
 	"code.cloudfoundry.org/guardian/rundmc/users"
 	"code.cloudfoundry.org/lager"
-	"github.com/containerd/containerd/linux/proc"
 	uuid "github.com/nu7hatch/gouuid"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -69,9 +64,10 @@ type RunContainerd struct {
 	statser                   Statser
 	useContainerdForProcesses bool
 	userLookupper             users.UserLookupper
+	cgroupManager             CgroupManager
 }
 
-func New(containerManager ContainerManager, processManager ProcessManager, bundleLoader BundleLoader, processBuilder ProcessBuilder, userLookupper users.UserLookupper, execer Execer, statser Statser, useContainerdForProcesses bool) *RunContainerd {
+func New(containerManager ContainerManager, processManager ProcessManager, bundleLoader BundleLoader, processBuilder ProcessBuilder, userLookupper users.UserLookupper, execer Execer, statser Statser, useContainerdForProcesses bool, cgroupManager CgroupManager) *RunContainerd {
 	return &RunContainerd{
 		containerManager:          containerManager,
 		processManager:            processManager,
@@ -81,6 +77,7 @@ func New(containerManager ContainerManager, processManager ProcessManager, bundl
 		statser:                   statser,
 		useContainerdForProcesses: useContainerdForProcesses,
 		userLookupper:             userLookupper,
+		cgroupManager:             cgroupManager,
 	}
 }
 
@@ -97,7 +94,7 @@ func (r *RunContainerd) Create(log lager.Logger, bundlePath, id string, io garde
 	}
 
 	if r.useContainerdForProcesses {
-		return r.writeUseHierarchy(id)
+		return r.cgroupManager.SetUseMemoryHierarchy(id)
 	}
 	return nil
 }
@@ -174,34 +171,4 @@ func (r *RunContainerd) Stats(log lager.Logger, id string) (gardener.ActualConta
 
 func (r *RunContainerd) WatchEvents(log lager.Logger, id string, eventsNotifier runrunc.EventsNotifier) error {
 	return fmt.Errorf("WatchEvents is not implemented yet")
-}
-
-type cgroupPaths struct {
-	Memory string
-}
-
-type containerState struct {
-	CgroupPaths cgroupPaths `json:"cgroup_paths"`
-}
-
-func (r *RunContainerd) writeUseHierarchy(handle string) error {
-	namespace, err := r.containerManager.GetNamespace()
-	if err != nil {
-		return err
-	}
-
-	statePath := filepath.Join(proc.RuncRoot, namespace, handle, "state.json")
-	stateFile, err := os.Open(statePath)
-	if err != nil {
-		return err
-	}
-	defer stateFile.Close()
-
-	var state containerState
-	err = json.NewDecoder(stateFile).Decode(&state)
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(filepath.Join(state.CgroupPaths.Memory, "memory.use_hierarchy"), []byte("1"), os.ModePerm)
 }
