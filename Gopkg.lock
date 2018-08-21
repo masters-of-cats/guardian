@@ -451,7 +451,7 @@
   version = "v1.0.1"
 
 [[projects]]
-  branch = "master"
+  branch = "connection-reset-logging"
   name = "github.com/opencontainers/runc"
   packages = [
     "libcontainer/cgroups",
@@ -461,7 +461,8 @@
     "libcontainer/user",
     "libcontainer/utils"
   ]
-  revision = "20aff4f0488c6d4b8df4d85b4f63f1f704c11abd"
+  revision = "387a3826ccb34debf510f26f1321ef397a04f151"
+  source = "https://github.com/masters-of-cats/runc.git"
 
 [[projects]]
   name = "github.com/opencontainers/runtime-spec"
@@ -682,6 +683,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a7bf3ffad4ee46d97e8633b9b51860beaa811e7d702bb3638c0139156b182a6a"
+  inputs-digest = "c9c61e4133a042dc87b20b84ff580956f6c9a6a61e346208b2abf97ab16a7734"
   solver-name = "gps-cdcl"
   solver-version = 1

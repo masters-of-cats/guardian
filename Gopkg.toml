@@ -135,7 +135,8 @@ required = ["gopkg.in/fsnotify.v1"]
 
 [[constraint]]
   name = "github.com/opencontainers/runc"
-  branch = "master"
+  source = "https://github.com/masters-of-cats/runc.git"
+  branch = "connection-reset-logging"
 
 [[constraint]]
   name = "github.com/opencontainers/runtime-spec"
