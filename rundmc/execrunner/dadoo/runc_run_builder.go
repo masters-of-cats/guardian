@@ -5,10 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func BuildRuncCommand(runtimePath, runMode, runcRoot, processPath, containerHandle, ttyConsoleSocket, logfilePath string) *exec.Cmd {
 	runtimeArgs := []string{}
+	runtimeArgs = append(runtimeArgs, runtimePath)
 	if runcRoot != "" {
 		runtimeArgs = append(runtimeArgs, "--root", runcRoot)
 	}
@@ -21,7 +23,9 @@ func BuildRuncCommand(runtimePath, runMode, runcRoot, processPath, containerHand
 	runtimeArgs = append(runtimeArgs, runmodeArgs(runMode, processPath)...)
 	runtimeArgs = append(runtimeArgs, ttyArgs(runMode, ttyConsoleSocket)...)
 	runtimeArgs = append(runtimeArgs, containerHandle)
-	return exec.Command(runtimePath, runtimeArgs...)
+
+	straceLogPath := fmt.Sprintf("/tmp/stracedebug--%s--%s.log", containerHandle, runMode)
+	return exec.Command("/bin/sh", "-c", fmt.Sprintf("strace -fvy -o %s %s", straceLogPath, strings.Join(runtimeArgs, " ")))
 }
 
 func runmodeArgs(runMode, bundlePath string) []string {
